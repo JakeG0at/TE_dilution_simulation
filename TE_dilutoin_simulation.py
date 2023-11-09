@@ -55,47 +55,49 @@ def update_grid(grid):
     global type2_type1_interaction
     global type3_type1_interaction
 
+    # Create a list of all grid positions for random selection
+    all_positions = [(x, y) for x in range(Grid_width) for y in range(Grid_height)]
+
     for y in range(Grid_height):
         for x in range(Grid_width):
             cell_type, length = grid[y][x]
-            # Check if Type 2 or Type 3 should turn into Type 0
-            if cell_type in [2, 3] and random.random() < 0.75:
+            # Check if Type 2 should turn into Type 0
+            if cell_type == 2 and random.random() < 0.10:
                 new_grid[y][x] = (0, 1)
                 continue  # Skip the rest of the loop and move to the next cell
+
+            # Type 3 will not turn into Type 0, so no check is needed for it
 
             if cell_type in [0, 1]:  # Stationary types
                 new_grid[y][x] = (cell_type, length)
             elif cell_type in [2, 3]:  # Mobile types
-                # There's only a 20% chance to mobilize
-                if random.random() < 0.2:
-                    # Determine new position with wrapping at edges
-                    dx = random.choice([-1, 1])  # Move left or right
-                    dy = random.choice([-1, 1])  # Move up or down
-                    new_x = (x + dx) % Grid_width
-                    new_y = (y + dy) % Grid_height
+                # There's now a 50% chance to mobilize
+                if random.random() < 0.5:
+                    # Select a new random position from the entire grid
+                    new_x, new_y = random.choice(all_positions)
 
                     # Check the cell at the new position
                     target_cell_type, target_length = grid[new_y][new_x]
 
-                    # Type 2 'copy and paste' interaction
-                    if cell_type == 2:
-                        if target_cell_type == 1:
-                            new_grid[y][x] = (0, 1)  # Leave behind a type 0 square
+                    # Interaction with Type 1
+                    if target_cell_type == 1:
+                        # Record the interaction
+                        if cell_type == 2:
                             type2_type1_interaction += 1
-                        elif target_cell_type == 0:
-                            new_grid[new_y][new_x] = (2, length)  # Become type 2 square
-                        else:
-                            new_grid[new_y][new_x] = (cell_type, length)  # Copy to new location
-
-                    # Type 3 'cut and paste' interaction
-                    elif cell_type == 3:
-                        if target_cell_type == 1:
-                            new_grid[y][x] = (0, 1)  # Leave behind a type 0 square
+                        elif cell_type == 3:
                             type3_type1_interaction += 1
-                        elif target_cell_type == 0:
-                            new_grid[new_y][new_x] = (3, length)  # Become type 3 square
-                        # Move to new location, leaving behind an empty space
-                        new_grid[y][x] = (0, 1)  # Leave behind a type 0 square
+                        # The result is the same type as the moving cell
+                        new_grid[new_y][new_x] = (cell_type, length)
+
+                    # If the target cell is Type 0, the moving cell takes its place
+                    elif target_cell_type == 0:
+                        new_grid[new_y][new_x] = (cell_type, length)
+
+                    # If the target cell is also mobile, they swap places (or any other defined interaction)
+                    elif target_cell_type in [2, 3]:
+                        new_grid[new_y][new_x] = (cell_type, length)
+                        new_grid[y][x] = (target_cell_type, target_length)
+
                 else:
                     # If the cell does not mobilize, it stays in its current location
                     new_grid[y][x] = (cell_type, length)
@@ -103,6 +105,21 @@ def update_grid(grid):
     return new_grid
 
 
+#calculate the Proportion of each type
+def calculate_proportions(grid):
+    proportions = {
+        'type_0': 0,
+        'type_1': 0,
+        'type_2': 0,
+        'type_3': 0
+    }
+    for row in grid:
+        for cell in row:
+            proportions[f'type_{cell[0]}'] += 1
+    total = sum(proportions.values())
+    for key in proportions:
+        proportions[key] /= total
+    return proportions
 
 def run_simulation(grid, steps, sleep_time=0.1):
     for step in range(steps):
@@ -112,7 +129,6 @@ def run_simulation(grid, steps, sleep_time=0.1):
         time.sleep(sleep_time)
         print(f"Type 2-Type 1 Interactions: {type2_type1_interaction}")
         print(f"Type 3-Type 1 Interactions: {type3_type1_interaction}")
-
+        print(f"Proportions: {calculate_proportions(grid)}")
 # Start the simulation for 100 steps
 run_simulation(grid, 100)
-
