@@ -1,18 +1,45 @@
 import numpy as np
 import random
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+
+# Which species is being modeled?
+Species = 'Fly'
+# What is the genome size of the species?
+Genome_size = 180000000
 
 # Constants
 GRID_HEIGHT = 2
-GRID_WIDTH = 100
+GRID_WIDTH = Genome_size
 BOX_TYPES = {'Grey': 0, 'White': 1, 'Black': 2, 'Red': 3}
 
+# This will first be modeled on the fly genome
+exons = 14000  # Corrected from 14,000 (which is a tuple) to 14000 (an integer)
+mean_len = 462
+median_len = 263
+max_len = 14544  # Corrected from 14,544 (which is a tuple) to 14544 (an integer)
+min_len = 2
+
+def random_distribution_of_gene_lens(genes, mean_len, median_len, max_len, min_len):
+    gene_lens = np.random.normal(mean_len, (mean_len - median_len), genes)
+    gene_lens = np.clip(gene_lens, min_len, max_len)
+    gene_lens = np.round(gene_lens)
+    return gene_lens
+
+exons_proportion = exons / Genome_size
+gene_lens = random_distribution_of_gene_lens(exons, mean_len, median_len, max_len, min_len)
+
 # Customizable variables for initial proportions
+# https://mobilednajournal.biomedcentral.com/articles/10.1186/s13100-020-00213-z#Sec9
+
 initial_proportions = {
-    'Grey': 0.3,  # 50% of the grid
-    'White': 0.3,  # 10% of the grid
-    'Black': 0.2,  # 20% of the grid
-    'Red': 0.2   # 20% of the grid
+    'White': exons_proportion,  # Proportion of exons
+    'Black': 0.02,  # 2% of the grid
+    'Red': 0.18,  # 18% of the grid
+    # Grey is the remaining proportion of the grid
+    'Grey': 1 - (exons_proportion + 0.02 + 0.18)
 }
+
 
 # Initialize the grid
 def initialize_grid():
