@@ -1,0 +1,11 @@
+2023-11-13 12:22:56,241 - INFO - Grid Density: 125633765/360000000 (34.898268055555555%)
+2023-11-13 12:23:04,199 - INFO - Resetting grid for new round
+2023-11-13 12:23:04,977 - INFO - Moving elements of type 2
+2023-11-13 12:23:05,806 - INFO - Moved 0 elements of type 2
+2023-11-13 12:23:05,806 - INFO - Moving elements of type 3
+2023-11-13 12:23:06,632 - INFO - Moved 0 elements of type 3
+2023-11-13 12:23:06,632 - INFO - Resetting grid for new round
+2023-11-13 12:23:06,896 - INFO - Moving elements of type 2
+2023-11-13 12:23:07,732 - INFO - Moved 0 elements of type 2
+2023-11-13 12:23:07,732 - INFO - Moving elements of type 3
+2023-11-13 12:23:08,562 - INFO - Moved 0 elements of type 3

@@ -3,6 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import truncnorm
 from matplotlib.backends.backend_pdf import PdfPages
+import logging
+
+#set up logging
+logging.basicConfig(filename='simulation.log.txt', filemode='w', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Function Definitions
 def initialize_grid(grid_height, grid_width):
@@ -110,13 +114,13 @@ def populate_grid(grid, element_lengths, element_type):
     for length in element_lengths:
         length = int(length)
         if length >= grid.shape[1]:
-            print(f"Skipping element of length {length} as it exceeds grid size {grid.shape[1]}")
+            logging.info(f"Skipping element of length {length} as it exceeds grid size {grid.shape[1]}")
             continue  # Skip this element as it's too long for the grid
 
         placed = False
         while not placed:
             if grid.shape[1] - length <= 0:
-                print(f"Error: length {length} is too large for grid size {grid.shape[1]}")
+                logging.info(f"Error: length {length} is too large for grid size {grid.shape[1]}")
                 break  # Break out of the while loop if this scenario occurs
 
             strand = np.random.randint(0, 2)  # Choose top (0) or bottom (1) strand randomly
@@ -132,6 +136,14 @@ populate_grid(grid, retrotransposons_lengths, 2)  # Retrotransposons as type 2
 populate_grid(grid, dnatransposons_lengths, 3)  # DNA transposons as type 3
 populate_grid(grid, non_coding_segment_lengths, 4)  # Non-coding regions as type 4
 
+def check_grid_density(grid):
+    non_zero_elements = np.count_nonzero(grid)
+    total_elements = grid.size
+    logging.info(f"Grid Density: {non_zero_elements}/{total_elements} ({non_zero_elements / total_elements * 100}%)")
+
+# After populating the grid
+check_grid_density(grid)
+
 def resize_grid(grid, additional_length):
     """ Resize the grid to accommodate additional length. """
     new_grid = np.zeros((grid.shape[0], grid.shape[1] + additional_length), dtype=int)
@@ -139,40 +151,37 @@ def resize_grid(grid, additional_length):
     return new_grid
 
 def move_element(grid, element_type, interaction_log, round_num):
+    logging.info(f"Moving elements of type {element_type}")
     element_positions = np.argwhere(grid == element_type)
+    num_moved_elements = 0  # Counter for the number of moved elements
+
     for pos in element_positions:
         strand, start_pos = pos[0], pos[1]
-        if np.random.rand() > 0:  # 100% chance of moving
+        if np.random.rand() > 0.5:  # 50% chance to move
             new_strand = np.random.randint(0, grid.shape[0])
-            new_start_pos = np.random.randint(0, grid.shape[1] - 1)
+            new_start_pos = np.random.randint(0, grid.shape[1])
 
-            # Check if resizing is needed
-            if new_start_pos == grid.shape[1] - 1 and grid[new_strand, new_start_pos] != 0:
-                grid = resize_grid(grid, 1)  # Resize the grid if needed
+            # Directly insert the element at the new position
+            # Log if an interaction occurs at the new position
+            if grid[new_strand, new_start_pos] != 0 and grid[new_strand, new_start_pos] != element_type:
+                interaction_type = (element_type, grid[new_strand, new_start_pos])
+                interaction_log[round_num][interaction_type] += 1
+                logging.info(f"Interaction recorded: {interaction_type} in round {round_num}")
 
-            # Shift elements to the right from the new_start_pos
-            grid[new_strand, new_start_pos+1:] = grid[new_strand, new_start_pos:-1]
-            grid[new_strand, new_start_pos] = element_type  # Insert the element
+            # Insert the element at the new position
+            grid[new_strand, new_start_pos] = element_type
 
             # Remove the element from its original position if it's not a retrotransposon leaving a copy
             if element_type != 3 or (strand == new_strand and start_pos == new_start_pos):
                 grid[strand, start_pos] = 0
 
-            # After moving, check for interactions
-            # Example: Check adjacent positions for other elements
-            for offset in [-1, 1]:  # Check positions to the left and right
-                adjacent_pos = start_pos + offset
-                if 0 <= adjacent_pos < grid.shape[1]:
-                    adjacent_element = grid[strand, adjacent_pos]
-                    if adjacent_element != 0 and adjacent_element != element_type:
-                        interaction_type = (element_type, adjacent_element)
-                        interaction_log[round_num][interaction_type] += 1
+            num_moved_elements += 1
+            logging.info(f"Moved element type {element_type} from {strand}:{start_pos} to {new_strand}:{new_start_pos}")
 
+    # Log the number of moved elements after processing all positions
+    logging.info(f"Moved {num_moved_elements} elements of type {element_type}")
 
 def initialize_interaction_log(num_rounds):
-    """
-    Initializes a log to record interactions.
-    """
     interaction_types = [
         (2, 2), (2, 3), (2, 1), (2, 4),
         (3, 3), (3, 2), (3, 1), (3, 4)
@@ -184,15 +193,19 @@ interaction_log = initialize_interaction_log(num_rounds)
 interaction_log[0]  # Displaying interaction log for the first round
 
 def reset_grid(grid, exon_lengths, retrotransposons_lengths, dnatransposons_lengths, non_coding_segment_lengths):
-    """
-    Resets the grid to its initial state with the specified genomic elements.
-    """
+    logging.info("Resetting grid for new round")
     grid.fill(0)  # Clear the grid
 
+def visualize_grid(grid):
+    plt.figure(figsize=(10, 6))
+    plt.imshow(grid, aspect='auto')
+    plt.colorbar(label='Element Type')
+    plt.title('Initial Grid Visualization')
+    plt.xlabel('Position')
+    plt.ylabel('Strand')
+    plt.show()
+
 def run_simulation(grid, num_rounds, exon_lengths, retrotransposons_lengths, dnatransposons_lengths, non_coding_segment_lengths):
-    """
-    Runs the simulation for a given number of rounds.
-    """
     interaction_log = initialize_interaction_log(num_rounds)
 
     for round_num in range(num_rounds):
@@ -204,7 +217,7 @@ def run_simulation(grid, num_rounds, exon_lengths, retrotransposons_lengths, dna
         move_element(grid, 3, interaction_log, round_num)  # Moving retrotransposons
 
     return interaction_log
-
+visualize_grid(grid)
 # Step 1: Run the full simulation
 interaction_log = run_simulation(grid, num_rounds, exon_lengths, retrotransposons_lengths, dnatransposons_lengths, non_coding_segment_lengths)
 
