@@ -61,7 +61,7 @@ non_coding_segment_lengths = np.random.uniform(low=100, high=non_coding_length/n
 while sum(non_coding_segment_lengths) > non_coding_length:
     non_coding_segment_lengths = np.random.uniform(low=100, high=non_coding_length/num_non_coding_segments, size=num_non_coding_segments)
 
-# Plotting Distributions
+## Plotting Distributions
 
 fig, axs = plt.subplots(4, 1, figsize=(12, 16))
 
@@ -142,8 +142,21 @@ def move_element(grid, element_type, interaction_log, round_num):
     element_positions = np.argwhere(grid == element_type)
     for pos in element_positions:
         strand, start_pos = pos[0], pos[1]
-        if np.random.rand() > 0.5:  # 50% chance to move
-            # Move logic (existing code)
+        if np.random.rand() > 0:  # 100% chance of moving
+            new_strand = np.random.randint(0, grid.shape[0])
+            new_start_pos = np.random.randint(0, grid.shape[1] - 1)
+
+            # Check if resizing is needed
+            if new_start_pos == grid.shape[1] - 1 and grid[new_strand, new_start_pos] != 0:
+                grid = resize_grid(grid, 1)  # Resize the grid if needed
+
+            # Shift elements to the right from the new_start_pos
+            grid[new_strand, new_start_pos+1:] = grid[new_strand, new_start_pos:-1]
+            grid[new_strand, new_start_pos] = element_type  # Insert the element
+
+            # Remove the element from its original position if it's not a retrotransposon leaving a copy
+            if element_type != 3 or (strand == new_strand and start_pos == new_start_pos):
+                grid[strand, start_pos] = 0
 
             # After moving, check for interactions
             # Example: Check adjacent positions for other elements
@@ -166,19 +179,8 @@ def initialize_interaction_log(num_rounds):
     ]
     return [{itype: 0 for itype in interaction_types} for _ in range(num_rounds)]
 
-# Example Usage
-grid = np.array([
-    [1, 2, 0, 3, 4],
-    [2, 0, 3, 1, 0]
-])
-
-num_rounds = 100
+num_rounds = 2 # two for now, will bump this up later once its working
 interaction_log = initialize_interaction_log(num_rounds)
-
-# Simulating one round
-move_element(grid, 2, interaction_log, 0)  # Moving DNA transposons
-move_element(grid, 3, interaction_log, 0)  # Moving retrotransposons
-
 interaction_log[0]  # Displaying interaction log for the first round
 
 def reset_grid(grid, exon_lengths, retrotransposons_lengths, dnatransposons_lengths, non_coding_segment_lengths):
