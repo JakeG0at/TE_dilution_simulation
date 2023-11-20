@@ -3,8 +3,6 @@ import numpy as np
 from scipy.stats import truncnorm
 import logging
 import csv
-import cProfile
-import pstats
 
 def initialize_grid(grid_height, grid_width):
     grid = np.zeros((grid_height, grid_width), dtype=int)
@@ -160,7 +158,7 @@ def run_simulation(grid, num_rounds, genomic_elements_lengths):
 
 def single_simulation_run(simulation_number):
     # Generate a random seed for this run and log it
-    seed = np.random.randint(0, 2**31 - 1)
+    seed = np.random.randint(0, 2**32 - 1)
     np.random.seed(seed)
     logging.info(f"Running simulation {simulation_number} with seed: {seed}")
     grid = initialize_grid(2, genome_size)

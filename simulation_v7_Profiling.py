@@ -1,26 +1,36 @@
-#Packages:
+# Packages:
 import numpy as np
 from scipy.stats import truncnorm
 import logging
 import csv
 import cProfile
 import pstats
+try:
+    profile  # The @profile decorator from line_profiler, if it's already defined
+except NameError:
+    def profile(func): 
+        return func  # Return the function unchanged if line_profiler is not active
 
+
+@profile
 def initialize_grid(grid_height, grid_width):
     grid = np.zeros((grid_height, grid_width), dtype=int)
     return grid
 
+@profile
 def create_truncated_normal_distribution(mean, min_val, max_val, stdv, num_samples):
     lower, upper = (min_val - mean) / stdv, (max_val - mean) / stdv
     distribution = truncnorm(lower, upper, loc=mean, scale=stdv)
     samples = distribution.rvs(num_samples)
     return np.round(samples).astype(int)
 
+@profile
 def resize_grid(grid, additional_length):
     new_grid = np.zeros((grid.shape[0], grid.shape[1] + additional_length), dtype=int)
     new_grid[:, :grid.shape[1]] = grid
     return new_grid
 
+@profile
 def check_and_record_interactions(grid, strand, start_pos, element_length, element_type, interaction_log, round_num):
     end_pos = start_pos + element_length
     adjacent_positions = [start_pos - 1, end_pos]  # positions next to start and end of the element
@@ -64,20 +74,15 @@ dnatransposons_lengths = create_truncated_normal_distribution(
     dnatransposons_stats['max_len'], dnatransposons_stats['std_dev'], num_dnatransposons)
 
 # Non-Coding Region Calculations
-
 total_coding_length = sum(exon_lengths) + sum(retrotransposons_lengths) + sum(dnatransposons_lengths)
 non_coding_length = genome_size - total_coding_length
 num_non_coding_segments = 5000
 
-# Non-Coding Region Calculations
-# Instead of generating and then rounding, do it in one step
-non_coding_segment_lengths = np.round(np.random.uniform(low=100, high=non_coding_length/num_non_coding_segments, size=num_non_coding_segments)).astype(int)
+non_coding_segment_lengths = np.round(np.random.uniform(low=100, high=non_coding_length / num_non_coding_segments, size=num_non_coding_segments)).astype(int)
 
-# The while loop will ensure the sum does not exceed the limit
 while sum(non_coding_segment_lengths) > non_coding_length:
-    non_coding_segment_lengths = np.round(np.random.uniform(low=100, high=non_coding_length/num_non_coding_segments, size=num_non_coding_segments)).astype(int)
+    non_coding_segment_lengths = np.round(np.random.uniform(low=100, high=non_coding_length / num_non_coding_segments, size=num_non_coding_segments)).astype(int)
 
-# Dictionary to store lengths
 genomic_elements_lengths = {
     'exon_lengths': exon_lengths,
     'retrotransposons_lengths': retrotransposons_lengths,
@@ -85,13 +90,13 @@ genomic_elements_lengths = {
     'non_coding_segment_lengths': non_coding_segment_lengths
 }
 
-# Function to populate the grid with a specific element
+@profile
 def populate_grid(grid, genomic_elements_lengths):
     height, width = grid.shape
     for element_type, lengths in genomic_elements_lengths.items():
         for length in lengths:
             available_positions = [(row, col) for row in range(height) for col in range(width - length + 1)
-            if grid[row, col:col + length].sum() == 0]
+                                   if grid[row, col:col + length].sum() == 0]
             np.random.shuffle(available_positions)
             
             if available_positions:
@@ -100,11 +105,13 @@ def populate_grid(grid, genomic_elements_lengths):
             else:
                 raise ValueError("No available position to place the element")
 
+@profile
 def check_grid_density(grid):
     non_zero_elements = np.count_nonzero(grid)
     total_elements = grid.size
     logging.info(f"Grid Density: {non_zero_elements}/{total_elements} ({non_zero_elements / total_elements * 100}%)")
 
+@profile
 def move_element_optimized(grid, element_type, interaction_log, round_num, element_length):
     height, width = grid.shape
     element_positions = np.argwhere(grid == element_type)
@@ -116,19 +123,17 @@ def move_element_optimized(grid, element_type, interaction_log, round_num, eleme
         new_strand = np.random.randint(0, height)
         new_start_pos = np.random.randint(0, width)
 
-        # Resize grid if necessary
         if new_start_pos + element_length > width:
             grid = resize_grid(grid, new_start_pos + element_length - width)
 
-        # Check and record interactions
         check_and_record_interactions(grid, new_strand, new_start_pos, element_length, element_type, interaction_log, round_num)
 
-        # Move the element
         grid[strand, start_pos:end_pos] = 0
         grid[new_strand, new_start_pos:new_start_pos + element_length] = element_type
 
     return grid
 
+@profile
 def initialize_interaction_log(num_rounds):
     interaction_types = [
         (2, 2), (2, 3), (2, 1), (2, 4),
@@ -136,14 +141,15 @@ def initialize_interaction_log(num_rounds):
     ]
     return [{itype: 0 for itype in interaction_types} for _ in range(num_rounds)]
 
+@profile
 def reset_grid(grid, exon_lengths, retrotransposons_lengths, dnatransposons_lengths, non_coding_segment_lengths):
     logging.info("Resetting grid for new round")
-    grid.fill(0)  # Clear the grid
+    grid.fill(0)
 
+@profile
 def run_simulation(grid, num_rounds, genomic_elements_lengths):
     interaction_log = initialize_interaction_log(num_rounds)
 
-    # Precompute lengths
     element_lengths = {etype: len(lengths) for etype, lengths in genomic_elements_lengths.items()}
 
     for round_num in range(num_rounds):
@@ -158,41 +164,44 @@ def run_simulation(grid, num_rounds, genomic_elements_lengths):
 
     return interaction_log
 
+def main():
+    num_rounds = 1  # Number of rounds per simulation
+    results = []
+
+    for i in range(num_rounds):
+        result = single_simulation_run(i)
+        results.append(result)
+
+    # Exporting results to a CSV file
+    csv_data = []
+    headers = ['simulation_number', 'seed', 'interaction', 'count']
+    for result in results:
+        simulation_number, seed, interaction_log = result
+        for round_num, log in enumerate(interaction_log):
+            for interaction_type, count in log.items():
+                csv_data.append([simulation_number, seed, interaction_type, count])
+
+    with open('simulation_results.csv', 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerow(headers)
+        for data in csv_data:
+            csvwriter.writerow(data)
+
+@profile
 def single_simulation_run(simulation_number):
-    # Generate a random seed for this run and log it
     seed = np.random.randint(0, 2**31 - 1)
     np.random.seed(seed)
     logging.info(f"Running simulation {simulation_number} with seed: {seed}")
     grid = initialize_grid(2, genome_size)
     element_types = {
-        1: exon_lengths, 
-        2: retrotransposons_lengths, 
-        3: dnatransposons_lengths, 
+        1: exon_lengths,
+        2: retrotransposons_lengths,
+        3: dnatransposons_lengths,
         4: non_coding_segment_lengths
     }
     populate_grid(grid, element_types)
-    interaction_log = run_simulation(grid, num_rounds, exon_lengths, retrotransposons_lengths, dnatransposons_lengths, non_coding_segment_lengths)
+    interaction_log = run_simulation(grid, num_rounds, genomic_elements_lengths)
     return simulation_number, seed, interaction_log
 
-num_rounds = 1      # Number of rounds per simulation
-
-results = []
-
-for i in range(num_rounds):
-    result = single_simulation_run(i)
-    results.append(result)
-
-# Exporting results to a CSV file
-csv_data = []
-headers = ['simulation_number', 'seed', 'interaction', 'count']
-for result in results:
-    simulation_number, seed, interaction_log = result
-    for round_num, log in enumerate(interaction_log):
-        for interaction_type, count in log.items():
-            csv_data.append([simulation_number, seed, interaction_type, count])
-
-with open('simulation_results.csv', 'w', newline='') as csvfile:
-    csvwriter = csv.writer(csvfile)
-    csvwriter.writerow(headers)
-    for data in csv_data:
-        csvwriter.writerow(data)
+if __name__ == "__main__":
+    cProfile.run("main()")
